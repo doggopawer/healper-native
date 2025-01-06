@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   SafeAreaView,
   StyleSheet,
   AppState,
   Vibration,
+  BackHandler,
+  Platform,
 } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import * as Notifications from "expo-notifications";
@@ -18,6 +20,7 @@ const App = () => {
   const [pushToken, setPushToken] = useState("");
   const [appState, setAppState] = useState(AppState.currentState);
   const [notificationId, setNotificationId] = useState("");
+  const webViewRef = useRef<WebView | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -127,16 +130,43 @@ const App = () => {
     }
   };
 
+  const handleBackButton = () => {
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(
+        `window.dispatchEvent(new Event("hardwareBackPress"));`
+      ); // 웹으로 이벤트 전달
+      return true; // 기본 동작 방지
+    }
+    return false; // 앱 종료
+  };
+
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      handleBackButton
+    );
+    return () => backHandler.remove();
+  }, []);
+
+  const userAgent = Platform.select({
+    ios: "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1",
+    android:
+      "Mozilla/5.0 (Linux; Android 10; Pixel 3 XL Build/QP1A.190711.020) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Mobile Safari/537.36",
+    default:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36",
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <WebView
+        ref={webViewRef}
         javaScriptEnabled={true}
         allowFileAccess={true}
         style={styles.webview}
         source={{
           uri: "https://www.healper.shop",
         }}
-        userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1" // 사용자 에이전트 설정
+        userAgent={userAgent} // 사용자 에이전트 설정
         onMessage={handleReactMessageSend}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
